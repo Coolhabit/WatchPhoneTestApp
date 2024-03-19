@@ -142,7 +142,7 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
     }
 
     private fun sendMessage(nodeId: String, path: String, data: ByteArray) {
-        Wearable.getMessageClient(this, Wearable.WearableOptions.Builder().apply { this.  }.build()).sendMessage(nodeId, path, data).apply {
+        Wearable.getMessageClient(this).sendMessage(nodeId, path, data).apply {
             addOnSuccessListener {
                 println("Successfully sent $path with data: $data to nodeId = $nodeId")
             }
