@@ -37,6 +37,7 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
     companion object {
         private const val BODY_SENSOR_PERMISSION_REQUEST_CODE = 1
         const val COMBINED_SENSOR_PATH = "combinedDataPath"
+        private var counter = 0
     }
 
     private lateinit var sensorManager: SensorManager
@@ -79,10 +80,14 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         if (!isTransmitting.value) return
 
-        lifecycleScope.launch {
-            when (event.sensor.type) {
-                Sensor.TYPE_GYROSCOPE -> {
-                    sendData(COMBINED_SENSOR_PATH, Clock.System.now().toEpochMilliseconds().longToByteArray())
+        counter++
+        if (counter >= 5) {
+            counter = 0
+            lifecycleScope.launch {
+                when (event.sensor.type) {
+                    Sensor.TYPE_GYROSCOPE -> {
+                        sendData(COMBINED_SENSOR_PATH, Clock.System.now().toEpochMilliseconds().longToByteArray())
+                    }
                 }
             }
         }
