@@ -6,20 +6,7 @@
         <State />
       </entry>
       <entry key="watch">
-        <State>
-          <runningDeviceTargetSelectedWithDropDown>
-            <Target>
-              <type value="RUNNING_DEVICE_TARGET" />
-              <deviceKey>
-                <Key>
-                  <type value="SERIAL_NUMBER" />
-                  <value value="RF8N73A6EJB" />
-                </Key>
-              </deviceKey>
-            </Target>
-          </runningDeviceTargetSelectedWithDropDown>
-          <timeTargetWasSelectedWithDropDown value="2024-03-19T11:37:39.989680300Z" />
-        </State>
+        <State />
       </entry>
     </value>
   </component>

@@ -26,6 +26,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.wearable.ChannelClient
+import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +44,8 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private val isTransmitting = mutableStateOf(false)
+    private var currentChannel: ChannelClient.Channel? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +90,7 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
             lifecycleScope.launch {
                 when (event.sensor.type) {
                     Sensor.TYPE_GYROSCOPE -> {
-                        sendData(COMBINED_SENSOR_PATH, Clock.System.now().toEpochMilliseconds().longToByteArray())
+                        sendData(Clock.System.now().toEpochMilliseconds().longToByteArray())
                     }
                 }
             }
@@ -114,8 +118,10 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
         isTransmitting.value = !isTransmitting.value
         if (isTransmitting.value) {
             registerSensors()
+            openChannel()
         } else {
             sensorManager.unregisterListener(this)
+            closeChannel()
         }
     }
 
@@ -131,28 +137,50 @@ class WatchActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    private fun sendData(path: String, data: ByteArray) {
-        lifecycleScope.launch(Dispatchers.Default) {
+    private fun openChannel() {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val nodes = Tasks.await(Wearable.getNodeClient(this@WatchActivity).connectedNodes)
+                val nodes = Tasks.await(Wearable.getNodeClient(applicationContext).connectedNodes)
                 val node = nodes.firstOrNull()
-                node?.let {
-                    sendMessage(it.id, path, data)
-                    Log.d("WATCH", "Data was sent to phone = $data")
+                node?.let { targetNode ->
+                    val channelClient = Wearable.getChannelClient(applicationContext)
+                    currentChannel = Tasks.await(channelClient.openChannel(targetNode.id, COMBINED_SENSOR_PATH))
+                    Log.d("WATCH", "Channel opened")
                 }
             } catch (e: Exception) {
-                println("Error in getting nodes: ${e.message}")
+                Log.e("WATCH", "Error opening channel: ${e.message}")
             }
         }
     }
 
-    private fun sendMessage(nodeId: String, path: String, data: ByteArray) {
-        Wearable.getMessageClient(this).sendMessage(nodeId, path, data).apply {
-            addOnSuccessListener {
-                println("Successfully sent $path with data: $data to nodeId = $nodeId")
+    private fun closeChannel() {
+        currentChannel?.let { channel ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    Wearable.getChannelClient(applicationContext).close(channel)
+                    Log.d("WATCH", "Channel closed")
+                } catch (e: Exception) {
+                    Log.e("WATCH", "Error closing channel: ${e.message}")
+                } finally {
+                    currentChannel = null
+                }
             }
-            addOnFailureListener {
-                println("Failed to send $path. Error: ${it.message}")
+        }
+    }
+
+    private fun sendData(data: ByteArray) {
+        currentChannel?.let { channel ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val outputStream = Tasks.await(Wearable.getChannelClient(applicationContext).getOutputStream(channel))
+                    outputStream.use {
+                        it.write(data)
+                        it.flush()
+                    }
+                    Log.d("WATCH", "Data sent")
+                } catch (e: Exception) {
+                    Log.e("WATCH", "Error sending data: ${e.message}")
+                }
             }
         }
     }
